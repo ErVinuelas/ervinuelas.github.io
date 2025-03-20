@@ -19,7 +19,7 @@ subtitle = "Student of Computer Science and Mathematics"
 [sidebar.avatar]
 enabled = true
 local = true
-src = "img/avatar.png"
+src = "img/web_image.png"
 
 [article]
 headingAnchor = false
