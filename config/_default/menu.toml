@@ -15,10 +15,3 @@ url = "https://github.com/ErVinuelas"
 [social.params]
 icon = "brand-github"
 
-[[social]]
-identifier = "linkedin"
-name = "LinkedIn"
-url = "https://twitter.com"
-
-[social.params]
-icon = "brand-linkedin"
