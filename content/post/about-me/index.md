@@ -3,7 +3,7 @@ title: About me
 description: A brief description of my academic/profesional life
 slug: about-me
 date: 2025-03-25 00:00:00+0000
-image: cover.jpg
+image:
 categories:
 tags:
 weight: 1       # You can add weight to some posts to override the default sorting (date descending)
