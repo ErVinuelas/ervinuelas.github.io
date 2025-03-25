@@ -1,10 +1,14 @@
 ---
 title: Links
 links:
-  - title: Hola
-    description: GitHub is the world's largest software development platform.
-    website: https://github.com
+  - title: My GitHub
+    description: Projects I am working on or used to.
+    website: https://github.com/ErVinuelas
     image: https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png
+  
+  - title: LinkedIn
+    description: No surprises here.
+    website: www.linkedin.com/in/pablo-martín-viñuelas
 menu:
     main: 
         weight: 4
