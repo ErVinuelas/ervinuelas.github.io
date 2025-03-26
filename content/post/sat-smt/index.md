@@ -4,7 +4,8 @@ description: My experience in the school
 slug: sat-smt-ar
 date: 2024-07-23
 image: sat-smt-ar.jpeg
-categories: Academic
+categories: 
+    - Academic
 tags:
 ---
 
