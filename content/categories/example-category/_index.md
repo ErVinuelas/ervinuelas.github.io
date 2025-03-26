@@ -1,6 +1,6 @@
 ---
-title: Example Category
-description: A description of this category
+title: Academic
+description: Related to the university and my own learnings
 image:
 
 # Badge style

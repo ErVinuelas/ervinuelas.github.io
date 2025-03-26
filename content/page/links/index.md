@@ -5,10 +5,18 @@ links:
     description: Projects I am working on or used to.
     website: https://github.com/ErVinuelas
     image: https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png
+
+  - title: Rocq prover
+    description: Interactive theorem prover reasoning in mathematics, computer science and more.
+    website: https://rocq-prover.org/
+    image: coq-logo.png
+
+  - title: SSProve
+    description: A foundational framework for modular cryptographic proofs in Rocq 
+    website: https://github.com/SSProve/ssprove
+    image:  
+    
   
-  - title: LinkedIn
-    description: No surprises here.
-    website: www.linkedin.com/in/pablo-martín-viñuelas
 menu:
     main: 
         weight: 4
@@ -18,20 +26,4 @@ menu:
 comments: false
 ---
 
-To use this feature, add `links` section to frontmatter.
-
-This page's frontmatter:
-
-```yaml
-links:
-  - title: GitHub
-    description: GitHub is the world's largest software development platform.
-    website: https://github.com
-    image: https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png
-  - title: TypeScript
-    description: TypeScript is a typed superset of JavaScript that compiles to plain JavaScript.
-    website: https://www.typescriptlang.org
-    image: ts-logo-128.jpg
-```
-
-`image` field accepts both local and external images.
+Some links that I think may interest you if you got here.

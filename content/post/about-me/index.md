@@ -1,18 +1,20 @@
 ---
 title: About me
-description: A brief description of my academic/profesional life
+description: A brief description of what I do or used to.
 slug: about-me
-date: 2025-03-25 00:00:00+0000
+date: 2025-03-25
 image:
 categories:
 tags:
 weight: 1       # You can add weight to some posts to override the default sorting (date descending)
 ---
 
-I consider myself passionate about science, especially Mathematics, and I have also developed a huge interest in Computer Science since I began my university studies. My passion for knowledge led me to study a double major, and now a Master in Computer Science at [Aarhus University](https://cs.au.dk/).
+I consider myself passionate about science, especially Mathematics, and I have also developed a huge interest in Computer Science since I began my university studies. My passion for knowledge led me to study a double major. A double major is a king of studies in Spain where you get to do two bachelors at the same time combining some of the subjects that the two share. For example, I studied Linear Algebra at the Math Department but took my Declarative Programming classes at the Computer Science Department. I proudly finished my studies at Universidad Complutense de Madrid on June 2024.
 
-Both my Bachelor's Degree Final Projects are about software verification, [one](https://github.com/ErVinuelas/verification-segments) using the [Dafny](https://dafny.org/) language and the [other](https://github.com/costa-group/termination_coq) using the [Rocq Proof Assistant](https://rocq-prover.org/). This topic is among my preferred areas of discourse, but I am receptive to engaging in discussions on other topics as well, such as Cryptography, Machine Learning and Data Science. This three topics are the ones I have chosen to specialize in.
+Both my Bachelor's Degree Final Projects are about software verification, [one](https://github.com/ErVinuelas/verification-segments) using the [Dafny](https://dafny.org/) language and the [other](https://github.com/costa-group/termination_coq) using the [Rocq Proof Assistant](https://rocq-prover.org/). This topic is among my preferred areas of discourse but I also enjoy other topics, such as Cryptography or Machine Learning. I really enjoy working in the intersection of math and computer science.
 
-I am a highly motivated and self-driven individual with a proven ability to work independently and as part of a team. My international stays have taught me how to be an independent person with communication skills, capable of adapting to new environments.
+That is why I decided to study a Master of Computer Science at Aarhus University and specialize in the before mentioned subjects. I am really enjoying my time here in Denmark.
 
-Besides, I have been practicing judo for over 15 years, during that time I have achieved to win numerous regional competitions, and even competed at different national and international tournaments, obtaining favorable results. My dedication to judo has instilled me discipline, perseverance, and a strong respect for others.
+In the past I have worked as a student assistant in the AI&ML department of Salling Group. I learnt a lot during my time there and spend most of my time in a project which aimed to reduce the theft in the shops. We used different approaches, but I mainly focused on aplying CNNs and other Deep Learning techniques. Right now I am working as a student programmer under the guidance of [Bas Spitters](https://users-cs.au.dk/spitters/) in a project for the [Ethereum Foundation](https://verified-zkevm.org).
+
+On my spare time, I like to practice judo (for the last 17 years!) and recently started to do some climbing. I also enjoy a good book and a tasty meal.
