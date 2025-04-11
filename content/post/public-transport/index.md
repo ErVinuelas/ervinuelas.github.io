@@ -18,8 +18,8 @@ thoughts.
 On the last hours of the trip, while I was crossing the usual mediterranean
 forests of Spain, I realized how lucky I am. Although it is a long trip, the mere
 fact that I can combine on a sigle day at least four different types of public
-transport and go through four countries makes me realise how well coordinated
-our society (the european) is.
+transport, go through four countries and manage to travel more than 2700km makes
+me realise how well coordinated our society (the european) is.
 
 The overview of the journey is as follows:
 
