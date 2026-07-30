@@ -2,7 +2,7 @@
 title: About me
 description: A brief description of what I do or used to.
 slug: about-me
-date: 2025-03-25
+date: 2026-07-30
 image:
 categories:
 tags:
