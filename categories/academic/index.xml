@@ -1,0 +1,264 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Academic on Pablo Martín</title><link>https://ervinuelas.github.io/categories/academic/</link><description>Recent content in Academic on Pablo Martín</description><generator>Hugo -- gohugo.io</generator><language>en-us</language><lastBuildDate>Tue, 30 Jun 2026 00:00:00 +0000</lastBuildDate><atom:link href="https://ervinuelas.github.io/categories/academic/index.xml" rel="self" type="application/rss+xml"/><item><title>Verifying libcrux AES using hax + Lean</title><link>https://ervinuelas.github.io/p/master-thesis/</link><pubDate>Tue, 30 Jun 2026 00:00:00 +0000</pubDate><guid>https://ervinuelas.github.io/p/master-thesis/</guid><description>&lt;p&gt;After a lot of work, I have finished my Master&amp;rsquo;s thesis at Aarhus University,
+under the supervision of &lt;a class="link" href="https://www.cs.au.dk/~spitters/" target="_blank" rel="noopener"
+&gt;Bas Spitters&lt;/a&gt;. This post is a
+brief, summary of what I did and why I think it is interesting. If you
+want the full details, the code is available in &lt;a class="link" href="https://github.com/ErVinuelas/aes_hax/" target="_blank" rel="noopener"
+&gt;this GitHub repository&lt;/a&gt;.&lt;/p&gt;
+&lt;h3 id="the-problem"&gt;The problem
+&lt;/h3&gt;&lt;p&gt;During my previous work with the SSProve framework, I focused on checking the properties
+of a given cryptographic construction. That is, we formalized the proofs presented
+in the same paper that the construction was explained.&lt;/p&gt;
+&lt;p&gt;For my master thesis I wanted to explore a different path, I wanted to build on an
+existing real-world implementation and check that the properties we wanted it to have
+were actually there. I also wanted to learn more about Lean, since I had only used Rocq
+as an interactive theorem prover in previous projects.&lt;/p&gt;
+&lt;p&gt;Therefore, I talked with the people at &lt;a class="link" href="https://cryspen.com/" target="_blank" rel="noopener"
+&gt;Cryspen&lt;/a&gt;, to see if they had a project in mind
+that could suit my interests. I had been following them for a while, since Bas worked with
+them, and I think that what they do as a company is very cool.&lt;/p&gt;
+&lt;p&gt;They suggested that I could use &lt;a class="link" href="https://github.com/hacspec/hax" target="_blank" rel="noopener"
+&gt;Hax&lt;/a&gt; and the new &lt;a class="link" href="https://leanprover.github.io/" target="_blank" rel="noopener"
+&gt;Lean&lt;/a&gt;
+backed they had been developing to reason around their &lt;a class="link" href="https://github.com/celabshq/libcrux/tree/main/crates/algorithms/aes" target="_blank" rel="noopener"
+&gt;AES&lt;/a&gt;
+implementation. Even though AES is a simple algorithm, the difficulty of the project
+would be dealing with having to work with a software that was being developed
+as I was doing the project.&lt;/p&gt;
+&lt;h3 id="the-two-tools-briefly"&gt;The two tools, briefly
+&lt;/h3&gt;&lt;p&gt;Before jumping into the example, it helps to know what the two tools do.&lt;/p&gt;
+&lt;p&gt;&lt;a class="link" href="https://github.com/hacspec/hax" target="_blank" rel="noopener"
+&gt;Hax&lt;/a&gt; takes idiomatic Rust and produces a &lt;em&gt;model&lt;/em&gt; of it
+in a backend. It already supported F*, Rocq and SSProve, and the Cryspen team had
+started work on a Lean backend, which is the one I used. One detail worth mentioning early:
+because any Rust computation can panic or diverge, Hax wraps every function in a monad
+(called &lt;code&gt;RustM&lt;/code&gt;) that accounts for those outcomes. So a humble &lt;code&gt;fn f(x: u32) -&amp;gt; u32&lt;/code&gt; does
+not come out as a function returning &lt;code&gt;u32&lt;/code&gt;, but as one returning &lt;code&gt;RustM u32&lt;/code&gt;. The generated
+code is not meant to be pretty; it is meant to faithfully mirror what the Rust does.&lt;/p&gt;
+&lt;p&gt;&lt;a class="link" href="https://leanprover.github.io/" target="_blank" rel="noopener"
+&gt;Lean&lt;/a&gt; is both a functional programming language and an
+interactive theorem prover. I relied on two of its features in particular. The first is its
+imperative &lt;code&gt;do&lt;/code&gt;-notation together with support for &lt;a class="link" href="https://en.wikipedia.org/wiki/Hoare_logic" target="_blank" rel="noopener"
+&gt;Hoare triples&lt;/a&gt;,
+which let me state &amp;ldquo;if this precondition holds, running the program gives a result
+satisfying this postcondition&amp;rdquo; and discharge it with the &lt;code&gt;mvcgen&lt;/code&gt; tactic. The second is
+&lt;code&gt;bv_decide&lt;/code&gt;, a tactic that closes goals about fixed-width bitvectors by calling out to a SAT
+solver. Both turned out to be a good fit for low-level code that is mostly bit tweakering.&lt;/p&gt;
+&lt;h3 id="the-workflow"&gt;The workflow
+&lt;/h3&gt;&lt;p&gt;For each function I wanted to verify, I ended up repeating the same four steps:&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;&lt;strong&gt;Pick&lt;/strong&gt; one of the core functions from the libcrux AES implementation.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Translate&lt;/strong&gt; it into a Lean model with Hax.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Specify&lt;/strong&gt; what the function is supposed to do, writing a Lean function that stays as
+close as possible to the textbook description of AES.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Prove&lt;/strong&gt; a theorem that ties the generated model to that specification.&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;That is the whole loop, and the rest of this post is really just that loop applied once, to
+MixColumns. Happily, everything I looked at did match the specification.&lt;/p&gt;
+&lt;h3 id="a-worked-example-mixcolumns"&gt;A worked example: MixColumns
+&lt;/h3&gt;&lt;p&gt;AES works on a 128-bit block laid out as a 4×4 matrix of bytes, called the &lt;em&gt;state&lt;/em&gt;. Each
+round pushes the state through a handful of transformations, one of which is MixColumns.
+It is a nice example to follow because it is small enough to describe in a paragraph, yet it
+touches almost everything that made the project interesting.&lt;/p&gt;
+&lt;h4 id="what-mixcolumns-is-supposed-to-do"&gt;What MixColumns is supposed to do
+&lt;/h4&gt;&lt;p&gt;Each column of the state is multiplied by a fixed matrix in \(GF(2^8)\):&lt;/p&gt;
+$$
+\begin{bmatrix} s'_{0,c} \\ s'_{1,c} \\ s'_{2,c} \\ s'_{3,c} \end{bmatrix} =
+\begin{bmatrix}
+02 &amp; 03 &amp; 01 &amp; 01 \\
+01 &amp; 02 &amp; 03 &amp; 01 \\
+01 &amp; 01 &amp; 02 &amp; 03 \\
+03 &amp; 01 &amp; 01 &amp; 02
+\end{bmatrix}
+\begin{bmatrix} s_{0,c} \\ s_{1,c} \\ s_{2,c} \\ s_{3,c} \end{bmatrix}
+$$&lt;p&gt;The catch is that this is not ordinary arithmetic. The entries are bytes interpreted as
+elements of the Galois field \(GF(2^8)\), so &amp;ldquo;\(+\)&amp;rdquo; is a bitwise XOR and &amp;ldquo;\(\cdot\)&amp;rdquo; is
+carry-less polynomial multiplication reduced modulo a fixed irreducible polynomial. In
+practice the only multipliers that appear here are \(02\) and \(03\), and multiplying by
+\(02\) is just a shift with a conditional XOR (the operation usually called &lt;code&gt;xtime&lt;/code&gt;). This
+is exactly why the field arithmetic has to be built up first: before I could say anything
+about MixColumns, Lean needed to understand what \(0x02 \cdot s\) even means.&lt;/p&gt;
+&lt;h4 id="how-libcrux-actually-implements-it"&gt;How libcrux actually implements it
+&lt;/h4&gt;&lt;p&gt;If the implementation kept the state as a 4×4 grid of bytes and multiplied it by that
+matrix, there would be almost nothing to verify. But libcrux is written to be fast and to
+run in constant time, so it &lt;em&gt;bitslices&lt;/em&gt; the state. Instead of
+sixteen bytes, the state is stored as an array of eight &lt;code&gt;u16&lt;/code&gt; values, where each &lt;code&gt;u16&lt;/code&gt;
+holds one &amp;ldquo;bit-plane&amp;rdquo;, the collection of all the &lt;em&gt;i&lt;/em&gt;-th bits of the original bytes. The
+byte-level matrix from above is gone; what is left is a sequence of shifts, masks and XORs
+across those planes.&lt;/p&gt;
+&lt;p&gt;The upside is a fast, branch-free implementation. The downside is that if you are not versed
+in this kind of techniques, the Rust does not visibly compute MixColumns at all, and you essentially
+have to trust the author. Closing that gap between &amp;ldquo;looks nothing like the spec&amp;rdquo; and
+&amp;ldquo;provably &lt;em&gt;is&lt;/em&gt; the spec&amp;rdquo; is the whole reason a project like this is worth doing.&lt;/p&gt;
+&lt;h4 id="modelling-it-in-lean"&gt;Modelling it in Lean
+&lt;/h4&gt;&lt;p&gt;There were two pieces to write. The first is the field arithmetic. I represented an element
+of \(GF(2^8)\) as an 8-bit vector and defined multiplication in the usual way, on top of the
+&lt;code&gt;xtime&lt;/code&gt; operation:&lt;/p&gt;
+&lt;div class="highlight"&gt;&lt;div class="chroma"&gt;
+&lt;table class="lntable"&gt;&lt;tr&gt;&lt;td class="lntd"&gt;
+&lt;pre tabindex="0" class="chroma"&gt;&lt;code&gt;&lt;span class="lnt"&gt; 1
+&lt;/span&gt;&lt;span class="lnt"&gt; 2
+&lt;/span&gt;&lt;span class="lnt"&gt; 3
+&lt;/span&gt;&lt;span class="lnt"&gt; 4
+&lt;/span&gt;&lt;span class="lnt"&gt; 5
+&lt;/span&gt;&lt;span class="lnt"&gt; 6
+&lt;/span&gt;&lt;span class="lnt"&gt; 7
+&lt;/span&gt;&lt;span class="lnt"&gt; 8
+&lt;/span&gt;&lt;span class="lnt"&gt; 9
+&lt;/span&gt;&lt;span class="lnt"&gt;10
+&lt;/span&gt;&lt;span class="lnt"&gt;11
+&lt;/span&gt;&lt;span class="lnt"&gt;12
+&lt;/span&gt;&lt;span class="lnt"&gt;13
+&lt;/span&gt;&lt;span class="lnt"&gt;14
+&lt;/span&gt;&lt;span class="lnt"&gt;15
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class="lntd"&gt;
+&lt;pre tabindex="0" class="chroma"&gt;&lt;code class="language-lean" data-lang="lean"&gt;&lt;span class="line"&gt;&lt;span class="cl"&gt;&lt;span class="kn"&gt;abbrev&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;GF8&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="o"&gt;:&lt;/span&gt;&lt;span class="bp"&gt;=&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;BitVec&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="mi"&gt;8&lt;/span&gt;&lt;span class="w"&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class="line"&gt;&lt;span class="cl"&gt;&lt;span class="w"&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class="line"&gt;&lt;span class="cl"&gt;&lt;span class="kn"&gt;def&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;polyRed&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="o"&gt;:&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;GF8&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="o"&gt;:&lt;/span&gt;&lt;span class="bp"&gt;=&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="mi"&gt;0&lt;/span&gt;&lt;span class="n"&gt;x1B&lt;/span&gt;&lt;span class="bp"&gt;#&lt;/span&gt;&lt;span class="mi"&gt;8&lt;/span&gt;&lt;span class="w"&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class="line"&gt;&lt;span class="cl"&gt;&lt;span class="w"&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class="line"&gt;&lt;span class="cl"&gt;&lt;span class="kn"&gt;def&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;xtime&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="o"&gt;(&lt;/span&gt;&lt;span class="n"&gt;a&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="o"&gt;:&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;GF8&lt;/span&gt;&lt;span class="o"&gt;)&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="o"&gt;:&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;GF8&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="o"&gt;:&lt;/span&gt;&lt;span class="bp"&gt;=&lt;/span&gt;&lt;span class="w"&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class="line"&gt;&lt;span class="cl"&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="k"&gt;let&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;shifted&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="o"&gt;:&lt;/span&gt;&lt;span class="bp"&gt;=&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;a&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="bp"&gt;&amp;lt;&amp;lt;&amp;lt;&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="mi"&gt;1&lt;/span&gt;&lt;span class="bp"&gt;#&lt;/span&gt;&lt;span class="mi"&gt;8&lt;/span&gt;&lt;span class="w"&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class="line"&gt;&lt;span class="cl"&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="k"&gt;if&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;a&lt;/span&gt;&lt;span class="bp"&gt;.&lt;/span&gt;&lt;span class="n"&gt;getLsbD&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="mi"&gt;7&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="k"&gt;then&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;shifted&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="bp"&gt;^^^&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;polyRed&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="k"&gt;else&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;shifted&lt;/span&gt;&lt;span class="w"&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class="line"&gt;&lt;span class="cl"&gt;&lt;span class="w"&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class="line"&gt;&lt;span class="cl"&gt;&lt;span class="kn"&gt;def&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;mulStep&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="o"&gt;(&lt;/span&gt;&lt;span class="n"&gt;b&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="o"&gt;:&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;GF8&lt;/span&gt;&lt;span class="o"&gt;)&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="o"&gt;(&lt;/span&gt;&lt;span class="n"&gt;state&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="o"&gt;:&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;GF8&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="bp"&gt;×&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;GF8&lt;/span&gt;&lt;span class="o"&gt;)&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="o"&gt;(&lt;/span&gt;&lt;span class="n"&gt;bitIdx&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="o"&gt;:&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;Nat&lt;/span&gt;&lt;span class="o"&gt;)&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="o"&gt;:&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;GF8&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="bp"&gt;×&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;GF8&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="o"&gt;:&lt;/span&gt;&lt;span class="bp"&gt;=&lt;/span&gt;&lt;span class="w"&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class="line"&gt;&lt;span class="cl"&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="k"&gt;let&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="o"&gt;(&lt;/span&gt;&lt;span class="n"&gt;acc&lt;/span&gt;&lt;span class="o"&gt;,&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;cur_a&lt;/span&gt;&lt;span class="o"&gt;)&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="o"&gt;:&lt;/span&gt;&lt;span class="bp"&gt;=&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;state&lt;/span&gt;&lt;span class="w"&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class="line"&gt;&lt;span class="cl"&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="o"&gt;(&lt;/span&gt;&lt;span class="k"&gt;if&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;b&lt;/span&gt;&lt;span class="bp"&gt;.&lt;/span&gt;&lt;span class="n"&gt;getLsbD&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;bitIdx&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="k"&gt;then&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;acc&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="bp"&gt;^^^&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;cur_a&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="k"&gt;else&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;acc&lt;/span&gt;&lt;span class="o"&gt;,&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;xtime&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;cur_a&lt;/span&gt;&lt;span class="o"&gt;)&lt;/span&gt;&lt;span class="w"&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class="line"&gt;&lt;span class="cl"&gt;&lt;span class="w"&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class="line"&gt;&lt;span class="cl"&gt;&lt;span class="kn"&gt;def&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;mul&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="o"&gt;(&lt;/span&gt;&lt;span class="n"&gt;a&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;b&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="o"&gt;:&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;GF8&lt;/span&gt;&lt;span class="o"&gt;)&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="o"&gt;:&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;GF8&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="o"&gt;:&lt;/span&gt;&lt;span class="bp"&gt;=&lt;/span&gt;&lt;span class="w"&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class="line"&gt;&lt;span class="cl"&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="k"&gt;let&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;bitIndices&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="o"&gt;:&lt;/span&gt;&lt;span class="bp"&gt;=&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;List&lt;/span&gt;&lt;span class="bp"&gt;.&lt;/span&gt;&lt;span class="n"&gt;range&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="mi"&gt;8&lt;/span&gt;&lt;span class="w"&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class="line"&gt;&lt;span class="cl"&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="o"&gt;(&lt;/span&gt;&lt;span class="n"&gt;bitIndices&lt;/span&gt;&lt;span class="bp"&gt;.&lt;/span&gt;&lt;span class="n"&gt;foldl&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="o"&gt;(&lt;/span&gt;&lt;span class="n"&gt;mulStep&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;b&lt;/span&gt;&lt;span class="o"&gt;)&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="o"&gt;(&lt;/span&gt;&lt;span class="n"&gt;zero&lt;/span&gt;&lt;span class="o"&gt;,&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;a&lt;/span&gt;&lt;span class="o"&gt;))&lt;/span&gt;&lt;span class="bp"&gt;.&lt;/span&gt;&lt;span class="m"&gt;1&lt;/span&gt;&lt;span class="w"&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;I also had to prove a few small lemmas that rewrite this definition into a shape
+&lt;code&gt;bv_decide&lt;/code&gt; is happy with, for instance that multiplying by &lt;code&gt;0x02&lt;/code&gt; is exactly &lt;code&gt;xtime&lt;/code&gt;. These
+are not exciting on their own, but MixColumns needs multiplication by &lt;code&gt;0x02&lt;/code&gt; and &lt;code&gt;0x03&lt;/code&gt;, so
+this groundwork is what makes the interesting proof possible.&lt;/p&gt;
+&lt;p&gt;The second piece is the specification itself. Here I deliberately tried to make it read like
+the matrix a reader already knows, rather than like the bitsliced code:&lt;/p&gt;
+&lt;div class="highlight"&gt;&lt;div class="chroma"&gt;
+&lt;table class="lntable"&gt;&lt;tr&gt;&lt;td class="lntd"&gt;
+&lt;pre tabindex="0" class="chroma"&gt;&lt;code&gt;&lt;span class="lnt"&gt; 1
+&lt;/span&gt;&lt;span class="lnt"&gt; 2
+&lt;/span&gt;&lt;span class="lnt"&gt; 3
+&lt;/span&gt;&lt;span class="lnt"&gt; 4
+&lt;/span&gt;&lt;span class="lnt"&gt; 5
+&lt;/span&gt;&lt;span class="lnt"&gt; 6
+&lt;/span&gt;&lt;span class="lnt"&gt; 7
+&lt;/span&gt;&lt;span class="lnt"&gt; 8
+&lt;/span&gt;&lt;span class="lnt"&gt; 9
+&lt;/span&gt;&lt;span class="lnt"&gt;10
+&lt;/span&gt;&lt;span class="lnt"&gt;11
+&lt;/span&gt;&lt;span class="lnt"&gt;12
+&lt;/span&gt;&lt;span class="lnt"&gt;13
+&lt;/span&gt;&lt;span class="lnt"&gt;14
+&lt;/span&gt;&lt;span class="lnt"&gt;15
+&lt;/span&gt;&lt;span class="lnt"&gt;16
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class="lntd"&gt;
+&lt;pre tabindex="0" class="chroma"&gt;&lt;code class="language-lean" data-lang="lean"&gt;&lt;span class="line"&gt;&lt;span class="cl"&gt;&lt;span class="kn"&gt;def&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;mix_columns_state_spec&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="o"&gt;(&lt;/span&gt;&lt;span class="n"&gt;st&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="o"&gt;:&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;Vector&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;u16&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="mi"&gt;8&lt;/span&gt;&lt;span class="o"&gt;)&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="o"&gt;:&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;Vector&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;u16&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="mi"&gt;8&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="o"&gt;:&lt;/span&gt;&lt;span class="bp"&gt;=&lt;/span&gt;&lt;span class="w"&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class="line"&gt;&lt;span class="cl"&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="o"&gt;(&lt;/span&gt;&lt;span class="mi"&gt;4&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="o"&gt;:&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;Nat&lt;/span&gt;&lt;span class="o"&gt;)&lt;/span&gt;&lt;span class="bp"&gt;.&lt;/span&gt;&lt;span class="n"&gt;fold&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="o"&gt;(&lt;/span&gt;&lt;span class="n"&gt;init&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="o"&gt;:&lt;/span&gt;&lt;span class="bp"&gt;=&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;zero_array&lt;/span&gt;&lt;span class="o"&gt;)&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="k"&gt;fun&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;group_indx&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="bp"&gt;_&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;res&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="bp"&gt;=&amp;gt;&lt;/span&gt;&lt;span class="w"&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class="line"&gt;&lt;span class="cl"&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="k"&gt;let&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;index&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="o"&gt;:&lt;/span&gt;&lt;span class="bp"&gt;=&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;group_indx&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="bp"&gt;*&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="mi"&gt;4&lt;/span&gt;&lt;span class="w"&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class="line"&gt;&lt;span class="cl"&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="k"&gt;let&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;s_0&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="o"&gt;:&lt;/span&gt;&lt;span class="bp"&gt;=&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;get_elem&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;st&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;index&lt;/span&gt;&lt;span class="w"&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class="line"&gt;&lt;span class="cl"&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="k"&gt;let&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;s_1&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="o"&gt;:&lt;/span&gt;&lt;span class="bp"&gt;=&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;get_elem&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;st&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="o"&gt;(&lt;/span&gt;&lt;span class="n"&gt;index&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="bp"&gt;+&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="mi"&gt;1&lt;/span&gt;&lt;span class="o"&gt;)&lt;/span&gt;&lt;span class="w"&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class="line"&gt;&lt;span class="cl"&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="k"&gt;let&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;s_2&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="o"&gt;:&lt;/span&gt;&lt;span class="bp"&gt;=&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;get_elem&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;st&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="o"&gt;(&lt;/span&gt;&lt;span class="n"&gt;index&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="bp"&gt;+&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="mi"&gt;2&lt;/span&gt;&lt;span class="o"&gt;)&lt;/span&gt;&lt;span class="w"&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class="line"&gt;&lt;span class="cl"&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="k"&gt;let&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;s_3&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="o"&gt;:&lt;/span&gt;&lt;span class="bp"&gt;=&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;get_elem&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;st&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="o"&gt;(&lt;/span&gt;&lt;span class="n"&gt;index&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="bp"&gt;+&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="mi"&gt;3&lt;/span&gt;&lt;span class="o"&gt;)&lt;/span&gt;&lt;span class="w"&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class="line"&gt;&lt;span class="cl"&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="c1"&gt;-- the + and * below are the GF(2^8) operations&lt;/span&gt;&lt;span class="w"&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class="line"&gt;&lt;span class="cl"&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="k"&gt;let&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;s_0&amp;#39;&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="o"&gt;:&lt;/span&gt;&lt;span class="bp"&gt;=&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="mi"&gt;0&lt;/span&gt;&lt;span class="n"&gt;x02&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="bp"&gt;*&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;s_0&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="bp"&gt;+&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="mi"&gt;0&lt;/span&gt;&lt;span class="n"&gt;x03&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="bp"&gt;*&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;s_1&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="bp"&gt;+&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;s_2&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="bp"&gt;+&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;s_3&lt;/span&gt;&lt;span class="w"&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class="line"&gt;&lt;span class="cl"&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="k"&gt;let&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;s_1&amp;#39;&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="o"&gt;:&lt;/span&gt;&lt;span class="bp"&gt;=&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="mi"&gt;0&lt;/span&gt;&lt;span class="n"&gt;x02&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="bp"&gt;*&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;s_1&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="bp"&gt;+&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="mi"&gt;0&lt;/span&gt;&lt;span class="n"&gt;x03&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="bp"&gt;*&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;s_2&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="bp"&gt;+&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;s_3&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="bp"&gt;+&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;s_0&lt;/span&gt;&lt;span class="w"&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class="line"&gt;&lt;span class="cl"&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="k"&gt;let&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;s_2&amp;#39;&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="o"&gt;:&lt;/span&gt;&lt;span class="bp"&gt;=&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="mi"&gt;0&lt;/span&gt;&lt;span class="n"&gt;x02&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="bp"&gt;*&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;s_2&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="bp"&gt;+&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="mi"&gt;0&lt;/span&gt;&lt;span class="n"&gt;x03&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="bp"&gt;*&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;s_3&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="bp"&gt;+&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;s_0&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="bp"&gt;+&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;s_1&lt;/span&gt;&lt;span class="w"&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class="line"&gt;&lt;span class="cl"&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="k"&gt;let&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;s_3&amp;#39;&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="o"&gt;:&lt;/span&gt;&lt;span class="bp"&gt;=&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="mi"&gt;0&lt;/span&gt;&lt;span class="n"&gt;x02&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="bp"&gt;*&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;s_3&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="bp"&gt;+&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="mi"&gt;0&lt;/span&gt;&lt;span class="n"&gt;x03&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="bp"&gt;*&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;s_0&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="bp"&gt;+&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;s_1&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="bp"&gt;+&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;s_2&lt;/span&gt;&lt;span class="w"&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class="line"&gt;&lt;span class="cl"&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="k"&gt;let&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;set_0&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="o"&gt;:&lt;/span&gt;&lt;span class="bp"&gt;=&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;set_elem&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;res&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;index&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;s_0&amp;#39;&lt;/span&gt;&lt;span class="w"&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class="line"&gt;&lt;span class="cl"&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="k"&gt;let&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;set_1&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="o"&gt;:&lt;/span&gt;&lt;span class="bp"&gt;=&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;set_elem&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;set_0&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="o"&gt;(&lt;/span&gt;&lt;span class="n"&gt;index&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="bp"&gt;+&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="mi"&gt;1&lt;/span&gt;&lt;span class="o"&gt;)&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;s_1&amp;#39;&lt;/span&gt;&lt;span class="w"&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class="line"&gt;&lt;span class="cl"&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="k"&gt;let&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;set_2&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="o"&gt;:&lt;/span&gt;&lt;span class="bp"&gt;=&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;set_elem&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;set_1&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="o"&gt;(&lt;/span&gt;&lt;span class="n"&gt;index&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="bp"&gt;+&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="mi"&gt;2&lt;/span&gt;&lt;span class="o"&gt;)&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;s_2&amp;#39;&lt;/span&gt;&lt;span class="w"&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class="line"&gt;&lt;span class="cl"&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;set_elem&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;set_2&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="o"&gt;(&lt;/span&gt;&lt;span class="n"&gt;index&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="bp"&gt;+&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="mi"&gt;3&lt;/span&gt;&lt;span class="o"&gt;)&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;s_3&amp;#39;&lt;/span&gt;&lt;span class="w"&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;The four lines in the middle are essentially the matrix written out row by row. The helper
+functions &lt;code&gt;get_elem&lt;/code&gt; and &lt;code&gt;set_elem&lt;/code&gt; hide the bitslicing, so the specification recovers the
+original 4×4 view of the state. That readability was a goal in itself: a specification is
+only useful if a human can look at it and agree that it really is AES.&lt;/p&gt;
+&lt;h4 id="proving-the-theorem"&gt;Proving the theorem
+&lt;/h4&gt;&lt;p&gt;With both sides in hand, the theorem to prove is simply that running the model produces the
+same state as the specification. Written as a Hoare triple it looks like this:&lt;/p&gt;
+&lt;div class="highlight"&gt;&lt;div class="chroma"&gt;
+&lt;table class="lntable"&gt;&lt;tr&gt;&lt;td class="lntd"&gt;
+&lt;pre tabindex="0" class="chroma"&gt;&lt;code&gt;&lt;span class="lnt"&gt;1
+&lt;/span&gt;&lt;span class="lnt"&gt;2
+&lt;/span&gt;&lt;span class="lnt"&gt;3
+&lt;/span&gt;&lt;span class="lnt"&gt;4
+&lt;/span&gt;&lt;span class="lnt"&gt;5
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class="lntd"&gt;
+&lt;pre tabindex="0" class="chroma"&gt;&lt;code class="language-lean" data-lang="lean"&gt;&lt;span class="line"&gt;&lt;span class="cl"&gt;&lt;span class="kn"&gt;theorem&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;mix_columns_state_correct&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="o"&gt;(&lt;/span&gt;&lt;span class="n"&gt;st&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="o"&gt;:&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;RustArray&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;u16&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="mi"&gt;8&lt;/span&gt;&lt;span class="o"&gt;)&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="o"&gt;:&lt;/span&gt;&lt;span class="w"&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class="line"&gt;&lt;span class="cl"&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="o"&gt;{&lt;/span&gt;&lt;span class="bp"&gt;|&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="bp"&gt;⌜&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;true&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="bp"&gt;⌝&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="bp"&gt;|&lt;/span&gt;&lt;span class="o"&gt;}&lt;/span&gt;&lt;span class="w"&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class="line"&gt;&lt;span class="cl"&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;mix_columns_state&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;st&lt;/span&gt;&lt;span class="w"&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class="line"&gt;&lt;span class="cl"&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="o"&gt;{&lt;/span&gt;&lt;span class="bp"&gt;|&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="bp"&gt;⇓&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="bp"&gt;⟨&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;res&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="bp"&gt;⟩&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="bp"&gt;=&amp;gt;&lt;/span&gt;&lt;span class="w"&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class="line"&gt;&lt;span class="cl"&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="bp"&gt;⌜&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;res&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="bp"&gt;=&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;mix_columns_state_spec&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="n"&gt;st&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="bp"&gt;⌝&lt;/span&gt;&lt;span class="w"&gt; &lt;/span&gt;&lt;span class="bp"&gt;|&lt;/span&gt;&lt;span class="o"&gt;}&lt;/span&gt;&lt;span class="w"&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;The precondition is trivial and the postcondition says &amp;ldquo;the result equals the readable
+spec&amp;rdquo;. The proof itself is mostly two tactics. First &lt;code&gt;mvcgen&lt;/code&gt; unfolds the monadic &lt;code&gt;do&lt;/code&gt;-program
+into a set of verification conditions. Then &lt;code&gt;bv_decide&lt;/code&gt; discharges the bitvector goals by
+handing them to a SAT solver, which is where all the shift/mask/XOR reasoning about the
+bitsliced representation actually gets checked.&lt;/p&gt;
+&lt;p&gt;That is the tidy version. In reality the conditions &lt;code&gt;mvcgen&lt;/code&gt; generated for these bitsliced
+functions were huge, spanning several screens, and Lean would sometimes run out of memory
+just trying to display them. I ended up writing a few helper tactics to rename and
+substitute the hypotheses in a systematic way, which was as much about keeping Lean alive as
+about keeping the proof readable.&lt;/p&gt;
+&lt;h3 id="what-was-hard"&gt;What was hard
+&lt;/h3&gt;&lt;p&gt;MixColumns went relatively smoothly, but it is a fair representative of the friction I ran
+into across the project. A few things stood out.&lt;/p&gt;
+&lt;p&gt;The biggest one was that the Lean backend was still young. Some Rust operations had no
+translation yet, and some library functions were simply missing, for example the operation
+that updates a value at an index in a slice, or the &lt;code&gt;UInt128&lt;/code&gt; type, which Lean did not offer
+but the libcrux code uses. Many of these I could work around by adding the missing pieces
+myself; others needed a hand from the Cryspen team, who were very helpful and generous with their time.
+Loop invariants were another gap: expressing them in the Rust source was not yet fully supported, so
+I had to fall back on embedding Lean code, which is workable but clunky.&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;bv_decide&lt;/code&gt; was a similar story. It is excellent on plain bitvectors, but as soon as the
+goal mixes in indices or other types it can get stuck, and when it does the failure is hard
+to debug. Combined with the enormous goals &lt;code&gt;mvcgen&lt;/code&gt; produced, and the limited control Lean
+gives you over how much of a proof it processes at once, a fair amount of my effort went
+into simply managing the size of things rather than the mathematics.&lt;/p&gt;
+&lt;p&gt;Finally, there is a genuine tension I do not think has a clean answer: the closer a
+specification sits to the code, the easier it is to link the two, but the harder it is to
+read; abstract too far in the other direction and it becomes hard to connect back to the
+implementation. I tried to find a reasonable middle ground, but where that middle sits
+feels fairly personal.&lt;/p&gt;
+&lt;h3 id="wrapping-up"&gt;Wrapping up
+&lt;/h3&gt;&lt;p&gt;By the end I was able to link the libcrux portable AES-128 and AES-256 implementations to a
+mathematical specification that someone who knows AES could actually read and
+trust. As far as I know this was the first time Hax and Lean had been used together on a
+complete cipher, so I mostly see the result as evidence that the approach is viable, not as
+a finished or polished piece of infrastructure. The tools will keep changing, and some of
+the rough edges above are already being smoothed out.&lt;/p&gt;
+&lt;p&gt;There is plenty left to do. I only tackled the AES core, not the surrounding AES-GCM
+protocol, and libcrux has many other primitives waiting for the same treatment, SHA3 would
+be a natural next target. On the tooling side, extending &lt;code&gt;bv_decide&lt;/code&gt; to the cases where it
+currently gets stuck would remove a lot of the pain, and it would be interesting to see how
+far AI-assisted proof generation can help with the more tedious parts.&lt;/p&gt;
+&lt;p&gt;Thanks to &lt;a class="link" href="https://www.cs.au.dk/~spitters/" target="_blank" rel="noopener"
+&gt;Bas Spitters&lt;/a&gt; for supervising, and to the
+&lt;a class="link" href="https://cryspen.com/" target="_blank" rel="noopener"
+&gt;Cryspen&lt;/a&gt; team for suggesting the project and patiently answering my
+questions along the way. If you want the details, everything is in
+&lt;a class="link" href="https://github.com/ErVinuelas/aes_hax/" target="_blank" rel="noopener"
+&gt;the repository&lt;/a&gt;.&lt;/p&gt;</description></item><item><title>SAT-SMT-AR summer school</title><link>https://ervinuelas.github.io/p/sat-smt-ar/</link><pubDate>Tue, 23 Jul 2024 00:00:00 +0000</pubDate><guid>https://ervinuelas.github.io/p/sat-smt-ar/</guid><description>&lt;img src="https://ervinuelas.github.io/p/sat-smt-ar/sat-smt-ar.jpeg" alt="Featured image of post SAT-SMT-AR summer school" /&gt;&lt;p&gt;This summer I attended the &lt;a class="link" href="https://sat-smt-ar-school.gitlab.io/www/2024/index.html" target="_blank" rel="noopener"
+&gt;SAT/SMT/AR summer school&lt;/a&gt; in Nancy, France. It was a very intense experience, I had the opportunity to learn about some of the ongoing research and the latest challenges in the field.&lt;/p&gt;
+&lt;p&gt;Although all the lectures were very interesting, I have to admit that the ones given by &lt;a class="link" href="https://hanielbarbosa.com/" target="_blank" rel="noopener"
+&gt;Haniel Barbosa&lt;/a&gt; and &lt;a class="link" href="https://www.lri.fr/~keller/index-en.html" target="_blank" rel="noopener"
+&gt;Chantal Keller&lt;/a&gt; were the ones I enjoyed the most, since those were the ones that were more related to my bachelor thesis. Besides, I had the opportunity to meet a lot of colleagues who were doing research on the topics of the school, which was a very enriching experience from a professional and personal way.&lt;/p&gt;
+&lt;p&gt;Here is a photo of us, after a nice lunch:&lt;/p&gt;
+&lt;p&gt;&lt;img src="https://ervinuelas.github.io/p/sat-smt-ar/sat-smt-ar-2.jpeg"
+width="1596"
+height="905"
+srcset="https://ervinuelas.github.io/p/sat-smt-ar/sat-smt-ar-2_hu_d1826d547aebe5af.jpeg 480w, https://ervinuelas.github.io/p/sat-smt-ar/sat-smt-ar-2_hu_7b3537a8c8b1d0b1.jpeg 1024w"
+loading="lazy"
+alt="Image of the attendants"
+class="gallery-image"
+data-flex-grow="176"
+data-flex-basis="423px"
+&gt;&lt;/p&gt;
+&lt;p&gt;I also enjoyed the oportunity of visiting Nancy as a city(wow! what a square they have).&lt;/p&gt;
+&lt;p&gt;Finally, I would like to thank the organization committee for accepting me as a participant and for making the effort of hosting 2024 edition of the school.&lt;/p&gt;</description></item></channel></rss>
