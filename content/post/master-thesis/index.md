@@ -81,8 +81,7 @@ touches almost everything that made the project interesting.
 Each column of the state is multiplied by a fixed matrix in \(GF(2^8)\):
 
 $$
-\begin{bmatrix} s'_{0,c} \\ s'_{1,c} \\ s'_{2,c} \\ s'_{3,c} \end{bmatrix}
-=
+\begin{bmatrix} s'_{0,c} \\ s'_{1,c} \\ s'_{2,c} \\ s'_{3,c} \end{bmatrix} =
 \begin{bmatrix}
 02 & 03 & 01 & 01 \\
 01 & 02 & 03 & 01 \\
